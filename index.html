@@ -64,12 +64,6 @@
   .addrow button{padding:0 16px;border:1px solid var(--line);background:#fbfcfd;border-radius:10px;font-weight:600;cursor:pointer;color:var(--steel)}
 
   /* plantilla / cota def rows */
-  .cdef-head,.cdef-row{display:grid;grid-template-columns:54px 1fr 1fr 1fr 28px;gap:6px;align-items:center}
-  .cdef-head{margin:4px 0}
-  .cdef-head span{font-size:10px;text-transform:uppercase;letter-spacing:.3px;color:var(--muted);font-weight:700;text-align:center}
-  .cdef-row{margin-bottom:6px}
-  .cdef-row input{width:100%;padding:9px 5px;border:1px solid var(--line);border-radius:8px;font-size:14px;text-align:center;background:#fbfcfd}
-  .cdef-row .delc{border:none;background:none;color:var(--no);font-size:22px;line-height:1;cursor:pointer;padding:0}
   .addcota{background:none;border:1px dashed var(--line);color:var(--blue);border-radius:8px;padding:9px;width:100%;font-weight:600;cursor:pointer;margin-top:4px}
 
   /* progress */
@@ -156,6 +150,22 @@
   #pinBox input{text-align:center;letter-spacing:8px;font-size:22px;margin-bottom:12px}
   #loginErr{display:none;text-align:center}
   .login-back{display:block;text-align:center;margin-top:14px;color:var(--blue);font-size:13px;font-weight:600;cursor:pointer}
+
+  .cdef-card{border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px;background:#fbfcfd}
+  .cdef-l1{display:grid;grid-template-columns:48px 86px 1fr 26px;gap:6px;align-items:center}
+  .cdef-l2{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px}
+  .cdef-card input{width:100%;padding:9px 6px;border:1px solid var(--line);border-radius:8px;font-size:14px;background:#fff}
+  .cdef-card .d-cota{text-align:center}
+  .tipo-tog{padding:9px 4px;border:1px solid var(--line);border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;background:#eef6ff;color:var(--blue)}
+  .tipo-tog.visual{background:#f3eefe;color:#7c3aed}
+  .cdef-card .delc{border:none;background:none;color:var(--no);font-size:20px;cursor:pointer;padding:0}
+  .thumbs{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+  .thumb{width:62px;height:62px;border-radius:9px;border:1px solid var(--line);overflow:hidden;position:relative;background:#f1f5f9;display:flex;align-items:center;justify-content:center}
+  .thumb img{width:100%;height:100%;object-fit:cover}
+  .thumb a{font-size:22px;text-decoration:none}
+  .thumb .lp{position:absolute;bottom:2px;right:2px;background:var(--amber);color:#1f2933;font-size:8px;font-weight:800;padding:1px 4px;border-radius:4px}
+  .addphoto{width:62px;height:62px;border-radius:9px;border:2px dashed var(--line);background:#fbfcfd;color:var(--muted);font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .addphoto input{display:none}
 </style>
 </head>
 <body>
@@ -225,7 +235,6 @@
       <div class="ctxbar"><span class="ctxpath" id="ctxPL"></span><a onclick="backToParte()">← Parte</a></div>
       <div class="card">
         <h2>Definir cotas del plano</h2>
-        <div class="cdef-head"><span>Cota</span><span>Descripción</span><span>Nominal</span><span>Tol.</span><span></span></div>
         <div id="cdefList"></div>
         <button class="addcota" onclick="addCdefRow()">+ Agregar cota</button>
         <button class="btn-primary" style="margin-top:12px" onclick="guardarPlantilla()">Guardar lista de cotas</button>
@@ -237,6 +246,11 @@
     <!-- etapa: pieza (cota por cota + cierre) -->
     <div id="stPieza" style="display:none">
       <div class="ctxbar"><span class="ctxpath" id="ctxPZ"></span><a onclick="backToParte()">← Parte</a></div>
+
+      <div class="card" id="piezasCard">
+        <h2>Piezas con avance</h2>
+        <div class="pick-grid" id="piezasList"></div>
+      </div>
 
       <div class="card">
         <div class="row" style="align-items:flex-end">
@@ -257,6 +271,14 @@
             <div class="bar"><div class="seg-ok" id="segOk" style="width:0"></div><div class="seg-no" id="segNo" style="width:0"></div></div>
           </div>
           <div id="cotaList"></div>
+        </div>
+
+        <div class="card">
+          <h2>Fotos de la pieza (opcional)</h2>
+          <div class="thumbs" id="fotoThumbs">
+            <label class="addphoto">+<input type="file" accept="image/*" capture="environment" onchange="addPieceFoto(event)"></label>
+          </div>
+          <div class="hint">Puedes agregar una o varias fotos de la pieza mientras inspeccionas. No son obligatorias.</div>
         </div>
 
         <div class="card">
@@ -338,7 +360,7 @@ let pickCli="", pickProy="";
 let knownCli  = JSON.parse(localStorage.getItem('mk2_cli')  || '[]');
 let knownProy = JSON.parse(localStorage.getItem('mk2_proy') || '{}');
 let closePhotos = { hoja:null, pieza:null };
-let SRV = { plantillas:[], inspecciones:[], cierres:[] };   // último fetch
+let SRV = { plantillas:[], inspecciones:[], cierres:[], fotos:[] };   // último fetch
 let openCota = null; // cota abierta en edición
 
 /* ================= IndexedDB ================= */
@@ -374,13 +396,17 @@ async function buildState(){
   // cierres: {parte|pieza:{...}}
   const cie={};
   SRV.cierres.forEach(c=>{cie[c.numParte+'|'+c.numPieza]=c;});
+  // fotos: {parte|pieza:[{url}|{local,data}]}
+  const fotos={};
+  (SRV.fotos||[]).forEach(f=>{(fotos[f.numParte+'|'+f.numPieza]=fotos[f.numParte+'|'+f.numPieza]||[]).push({url:f.url});});
   // overlay con cola local (gana lo local)
   cola.forEach(it=>{
     if(it.op==='plantilla'){ plant[it.numParte]=it.cotas.map(c=>Object.assign({numParte:it.numParte},c)); }
     if(it.op==='cota'){ insp[it.numParte+'|'+it.numPieza+'|'+it.cota]=it; }
     if(it.op==='cierre'){ cie[it.numParte+'|'+it.numPieza]={numParte:it.numParte,numPieza:it.numPieza,total:it.total,fechaCierre:it.fechaCierre,_local:true}; }
+    if(it.op==='foto'){ (fotos[it.numParte+'|'+it.numPieza]=fotos[it.numParte+'|'+it.numPieza]||[]).push({local:true,data:it.fotoData}); }
   });
-  return {plant,insp,cie};
+  return {plant,insp,cie,fotos};
 }
 
 /* ================= UI helpers ================= */
@@ -397,6 +423,7 @@ let toastT;
 function toast(m,bad){const t=document.getElementById('toast');t.innerHTML=m;t.className='toast show'+(bad?' bad':'');clearTimeout(toastT);toastT=setTimeout(()=>t.className='toast',2600);}
 function val(id){return (document.getElementById(id).value||'').trim();}
 function esc(s){return String(s).replace(/'/g,"\\'");}
+function attrEsc(s){return String(s==null?'':s).replace(/"/g,'&quot;');}
 function today(){return new Date().toISOString().slice(0,10);}
 
 /* ================= Login ================= */
@@ -480,19 +507,36 @@ function openPlantilla(cotas){
   (cotas&&cotas.length?cotas:[{}]).forEach(c=>addCdefRow(c));
   document.getElementById('plErr').style.display='none';
 }
-function addCdefRow(c){c=c||{};const row=document.createElement('div');row.className='cdef-row';
-  row.innerHTML=`<input class="d-cota mono" inputmode="numeric" placeholder="#" value="${c.cota||''}">`+
-    `<input class="d-desc" placeholder="desc (opc)" value="${c.desc||''}">`+
-    `<input class="d-nom mono" inputmode="decimal" placeholder="nom" value="${c.nominal||''}">`+
-    `<input class="d-tol" placeholder="±tol" value="${c.tol||''}">`+
-    `<button class="delc" onclick="this.parentNode.remove()">×</button>`;
-  document.getElementById('cdefList').appendChild(row);}
+function addCdefRow(c){
+  c=c||{};const vis=(c.tipo==='visual');
+  const row=document.createElement('div');row.className='cdef-card';
+  row.innerHTML=
+    `<div class="cdef-l1">`+
+      `<input class="d-cota mono" inputmode="numeric" placeholder="#" value="${c.cota||''}">`+
+      `<button class="tipo-tog ${vis?'visual':''}" onclick="toggleTipo(this)">${vis?'Visual':'Métrico'}</button>`+
+      `<input class="d-desc" placeholder="descripción" value="${(c.desc||'').replace(/"/g,'&quot;')}">`+
+      `<button class="delc" onclick="this.closest('.cdef-card').remove()">×</button>`+
+    `</div>`+
+    `<div class="cdef-l2" style="${vis?'display:none':''}">`+
+      `<input class="d-nom mono" inputmode="decimal" placeholder="nominal" value="${c.nominal||''}">`+
+      `<input class="d-tol" placeholder="±tol (ej. ±0.05)" value="${c.tol||''}">`+
+    `</div>`;
+  document.getElementById('cdefList').appendChild(row);
+}
+function toggleTipo(btn){
+  const vis=btn.classList.toggle('visual');
+  btn.textContent=vis?'Visual':'Métrico';
+  btn.closest('.cdef-card').querySelector('.cdef-l2').style.display=vis?'none':'';
+}
 async function editarPlantilla(){const s=await buildState();openPlantilla(s.plant[activePart]||[]);}
 async function guardarPlantilla(){
-  const rows=[...document.querySelectorAll('#cdefList .cdef-row')].map(r=>({
-    cota:r.querySelector('.d-cota').value.trim(),desc:r.querySelector('.d-desc').value.trim(),
-    nominal:r.querySelector('.d-nom').value.trim(),tol:r.querySelector('.d-tol').value.trim()
-  })).filter(c=>c.cota);
+  const rows=[...document.querySelectorAll('#cdefList .cdef-card')].map(r=>{
+    const vis=r.querySelector('.tipo-tog').classList.contains('visual');
+    return {cota:r.querySelector('.d-cota').value.trim(),tipo:vis?'visual':'metrico',
+      desc:r.querySelector('.d-desc').value.trim(),
+      nominal:vis?'':r.querySelector('.d-nom').value.trim(),
+      tol:vis?'':r.querySelector('.d-tol').value.trim()};
+  }).filter(c=>c.cota);
   const err=document.getElementById('plErr');
   if(!rows.length){err.textContent='Agrega al menos una cota con número.';err.style.display='block';return;}
   await enqueue({localId:Date.now()+'-'+Math.random().toString(36).slice(2,6),key:'plantilla|'+activePart,op:'plantilla',numParte:activePart,cotas:rows});
@@ -502,14 +546,28 @@ async function guardarPlantilla(){
 }
 
 /* ----- pieza (cota por cota) ----- */
-function goPieza(){
+async function goPieza(){
   stage('Pieza');
   document.getElementById('ctxPZ').innerHTML=`📐 ${activePart}<span class="sep">›</span>${activeProy}`;
   document.getElementById('piezaInput').value=activePiece||'001';
   document.getElementById('piezaWork').style.display='none';
+  const s=await buildState();
+  // piezas con avance para esta parte
+  const pzs={};
+  Object.values(s.insp).forEach(i=>{if(i.numParte===activePart)pzs[i.numPieza]=pzs[i.numPieza]||{ok:0,no:0};});
+  Object.keys(s.cie).forEach(k=>{const c=s.cie[k];if(c.numParte===activePart){pzs[c.numPieza]=pzs[c.numPieza]||{ok:0,no:0};pzs[c.numPieza].total=c.total;}});
+  Object.values(s.insp).forEach(i=>{if(i.numParte===activePart){if(i.veredicto==='OK')pzs[i.numPieza].ok++;else pzs[i.numPieza].no++;}});
+  const keys=Object.keys(pzs).sort((a,b)=>{const na=parseInt(a,10),nb=parseInt(b,10);return (isNaN(na)||isNaN(nb))?a.localeCompare(b):na-nb;});
+  document.getElementById('piezasList').innerHTML=keys.length?keys.map(k=>{
+    const p=pzs[k];const dot=p.total?(p.total==='OK'?'✓':'✕'):'•';
+    const col=p.total==='OK'?'var(--ok)':(p.total==='NO OK'?'var(--no)':'var(--muted)');
+    return `<button class="pick" onclick="abrirPieza('${esc(k)}')"><span style="color:${col};font-weight:900">${dot}</span> ${k} <small style="color:var(--muted);font-weight:500">${p.ok+p.no} cota(s)</small></button>`;
+  }).join(''):'<div class="empty" style="padding:6px">Sin piezas aún. Escribe un número abajo para empezar.</div>';
+  document.getElementById('piezasCard').style.display=keys.length?'block':'none';
 }
-async function abrirPieza(){
-  const pz=val('piezaInput');if(!pz){toast('Escribe el No. de pieza',true);return;}
+async function abrirPieza(pz){
+  pz=pz||val('piezaInput');if(!pz){toast('Escribe el No. de pieza',true);return;}
+  document.getElementById('piezaInput').value=pz;
   activePiece=pz; openCota=null;
   closePhotos={hoja:null,pieza:null};
   resetSlot('slotHoja','📄','Hoja de registro','inHoja','hoja');
@@ -527,21 +585,38 @@ async function renderPieza(){
     const rec=s.insp[activePart+'|'+activePiece+'|'+c.cota];
     let stt='pend',lbl='Pendiente';
     if(rec){done++; if(rec.veredicto==='OK'){ok++;stt='ok';lbl='OK';} else {no++;stt='no';lbl='NO OK';}}
-    const spec=[c.desc,(c.nominal?('nom '+c.nominal):''),(c.tol?('tol '+c.tol):'')].filter(Boolean).join(' · ');
-    const med=rec?(' · med '+(rec.medido||'')):'';
-    return `<div class="cota" id="cota-${esc(c.cota)}">
-      <div class="cota-h" onclick="toggleCota('${esc(c.cota)}')">
-        <span class="num">${c.cota}</span><span class="spec">${spec}${med}</span><span class="cstat ${stt}">${lbl}</span>
-      </div>
-      <div class="cota-body">
-        <div class="specline">Nominal: <b>${c.nominal||'—'}</b> &nbsp; Tol: <b>${c.tol||'—'}</b>${c.desc?(' &nbsp; '+c.desc):''}</div>
-        <label>Resultado medido</label>
-        <input type="text" class="mono med-in" id="med-${esc(c.cota)}" inputmode="decimal" placeholder="valor medido" value="${rec?(rec.medido||''):''}" oninput="autoSuggest('${esc(c.cota)}','${esc(c.nominal||'')}','${esc(c.tol||'')}')">
+    const visual=(c.tipo==='visual');
+    const tipoTag=visual?'<span style="color:#7c3aed;font-weight:700">Visual</span>':'';
+    const specParts=visual?[c.desc].filter(Boolean):[c.desc,(c.nominal?('nom '+c.nominal):''),(c.tol?('tol '+c.tol):'')].filter(Boolean);
+    const spec=specParts.join(' · ');
+    let extra='';
+    if(rec&&rec.veredicto==='NO OK') extra=' · '+(visual?(rec.comentario||''):('med '+(rec.medido||'')));
+    let body;
+    if(visual){
+      body=`<div class="specline">Inspección visual${c.desc?(' — '+c.desc):''}</div>
         <div class="verdict">
           <button id="vok-${esc(c.cota)}" onclick="setCotaV('${esc(c.cota)}','OK')">✓ Acepta</button>
           <button id="vno-${esc(c.cota)}" onclick="setCotaV('${esc(c.cota)}','NO OK')">✕ Rechaza</button>
         </div>
-        <button class="btn-primary" style="margin-top:12px" onclick="guardarCota('${esc(c.cota)}','${esc(c.nominal||'')}','${esc(c.tol||'')}','${esc(c.desc||'')}')">Guardar cota</button>
+        <label style="margin-top:10px">Comentario / defecto (si rechazas)</label>
+        <input type="text" id="com-${esc(c.cota)}" placeholder="describe el defecto" value="${attrEsc(rec?rec.comentario:'')}">`;
+    } else {
+      body=`<div class="specline">Nominal: <b>${c.nominal||'—'}</b> &nbsp; Tol: <b>${c.tol||'—'}</b>${c.desc?(' &nbsp; '+c.desc):''}</div>
+        <label>Resultado medido (solo si rechazas)</label>
+        <input type="text" class="mono" id="med-${esc(c.cota)}" inputmode="decimal" placeholder="valor medido" value="${attrEsc(rec?rec.medido:'')}" oninput="autoSuggest('${esc(c.cota)}')">
+        <div class="verdict">
+          <button id="vok-${esc(c.cota)}" onclick="setCotaV('${esc(c.cota)}','OK')">✓ Acepta</button>
+          <button id="vno-${esc(c.cota)}" onclick="setCotaV('${esc(c.cota)}','NO OK')">✕ Rechaza</button>
+        </div>
+        <label style="margin-top:10px">Comentario (opcional)</label>
+        <input type="text" id="com-${esc(c.cota)}" placeholder="nota (opcional)" value="${attrEsc(rec?rec.comentario:'')}">`;
+    }
+    return `<div class="cota" id="cota-${esc(c.cota)}" data-tipo="${visual?'visual':'metrico'}" data-nom="${attrEsc(c.nominal)}" data-tol="${attrEsc(c.tol)}" data-desc="${attrEsc(c.desc)}">
+      <div class="cota-h" onclick="toggleCota('${esc(c.cota)}')">
+        <span class="num">${c.cota}</span><span class="spec">${tipoTag}${tipoTag&&spec?' · ':''}${spec}${extra}</span><span class="cstat ${stt}">${lbl}</span>
+      </div>
+      <div class="cota-body">${body}
+        <button class="btn-primary" style="margin-top:12px" onclick="guardarCota('${esc(c.cota)}')">Guardar cota</button>
       </div></div>`;
   }).join('') || '<div class="empty">Esta parte no tiene cotas. Edita la lista arriba.</div>';
   // estado verdict preseleccionado
@@ -565,6 +640,11 @@ async function renderPieza(){
   else {cs.style.display='block';cs.className='closebanner';cs.style.background='#f1f5f9';cs.style.color='#6b7681';cs.textContent='Faltan '+(tot-done)+' cota(s) para poder cerrar OK';}
   document.getElementById('btnCerrar').disabled=!can;
   document.getElementById('btnCerrar').dataset.total=sug||'';
+  // fotos de la pieza (durante inspección)
+  const fts=(s.fotos[activePart+'|'+activePiece])||[];
+  document.getElementById('fotoThumbs').innerHTML=
+    '<label class="addphoto">+<input type="file" accept="image/*" capture="environment" onchange="addPieceFoto(event)"></label>'+
+    fts.map(f=>f.local?`<div class="thumb"><img src="${f.data}"><span class="lp">sin subir</span></div>`:`<div class="thumb"><a href="${f.url}" target="_blank">📷</a></div>`).join('');
 }
 function toggleCota(c){const el=document.getElementById('cota-'+c);el.classList.toggle('open');}
 function markV(c,v){document.getElementById('vok-'+c).className=v==='OK'?'sel-ok':'';document.getElementById('vno-'+c).className=v==='NO OK'?'sel-no':'';}
@@ -577,20 +657,36 @@ function autoVerdict(nominal,tol,medido){
   else return null;
   return (m>=lo-1e-9&&m<=hi+1e-9)?'OK':'NO OK';
 }
-function autoSuggest(c,nom,tol){const med=document.getElementById('med-'+c).value.trim();const v=autoVerdict(nom,tol,med);if(v){markV(c,v);document.getElementById('cota-'+c).dataset.v=v;}}
-async function guardarCota(c,nom,tol,desc){
-  const med=val('med-'+c);
-  const v=document.getElementById('cota-'+c).dataset.v;
-  if(!med){toast('Escribe el valor medido',true);return;}
+function autoSuggest(c){const el=document.getElementById('cota-'+c);const me=document.getElementById('med-'+c);const med=me?me.value.trim():'';const v=autoVerdict(el.dataset.nom,el.dataset.tol,med);if(v){markV(c,v);el.dataset.v=v;}}
+async function guardarCota(c){
+  const el=document.getElementById('cota-'+c);
+  const tipo=el.dataset.tipo, nom=el.dataset.nom||'', tol=el.dataset.tol||'', desc=el.dataset.desc||'';
+  const v=el.dataset.v;
+  const me=document.getElementById('med-'+c); const med=me?me.value.trim():'';
+  const co=document.getElementById('com-'+c); const com=co?co.value.trim():'';
   if(!v){toast('Marca Acepta o Rechaza',true);return;}
+  if(v==='NO OK'){
+    if(tipo==='metrico'&&!med){toast('Escribe el valor medido del rechazo',true);return;}
+    if(tipo==='visual'&&!com){toast('Escribe el comentario del rechazo',true);return;}
+  }
   await enqueue({localId:Date.now()+'-'+Math.random().toString(36).slice(2,6),key:'cota|'+activePart+'|'+activePiece+'|'+c,op:'cota',
     cliente:activeCli,proyecto:activeProy,numParte:activePart,numPieza:activePiece,cota:c,
-    nominal:nom,tol:tol,desc:desc,medido:med,veredicto:v,
+    tipo:tipo,nominal:nom,tol:tol,desc:desc,medido:med,comentario:com,veredicto:v,
     fechaInspeccion:today(),capturadoEn:new Date().toISOString()});
   toast(v==='OK'?'✓ Cota aceptada':'✕ Cota rechazada');
   if(navigator.onLine) sincronizar(true);
   await renderPieza();
 }
+
+/* ----- fotos de la pieza (durante inspección) ----- */
+function addPieceFoto(ev){const f=ev.target.files[0];if(!f)return;const img=new Image();const rd=new FileReader();
+  rd.onload=e=>{img.onload=async()=>{let w=img.width,h=img.height;if(Math.max(w,h)>MAX_PX){const r=MAX_PX/Math.max(w,h);w=Math.round(w*r);h=Math.round(h*r);}
+    const cv=document.createElement('canvas');cv.width=w;cv.height=h;cv.getContext('2d').drawImage(img,0,0,w,h);
+    const data=cv.toDataURL('image/jpeg',JPEG_Q);
+    const lid=Date.now()+'-'+Math.random().toString(36).slice(2,6);
+    await enqueue({localId:lid,key:'foto|'+lid,op:'foto',cliente:activeCli,proyecto:activeProy,numParte:activePart,numPieza:activePiece,fotoData:data,fecha:today(),capturadoEn:new Date().toISOString()});
+    toast('Foto agregada');if(navigator.onLine)sincronizar(true);await renderPieza();};img.src=e.target.result;};
+  rd.readAsDataURL(f);}
 
 /* ----- cierre de pieza ----- */
 function grabClose(ev,slot){const f=ev.target.files[0];if(!f)return;const img=new Image();const rd=new FileReader();
@@ -629,7 +725,7 @@ async function sincronizar(silent){
   syncing=true;const btn=document.getElementById('btnSync');if(btn)btn.innerHTML='<span class="spin"></span> Sincronizando…';
   let okN=0,failN=0;
   // ordena: plantillas → cotas → cierres
-  const order={plantilla:0,cota:1,cierre:2};
+  const order={plantilla:0,cota:1,foto:2,cierre:3};
   cola.sort((a,b)=>(order[a.op]-order[b.op])||a.localId.localeCompare(b.localId));
   for(const it of cola){
     try{const r=await fetch(APPS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(it)});
@@ -645,11 +741,12 @@ async function renderPend(){
   const cola=await idbAll('cola');document.getElementById('pCount').textContent=cola.length;
   const list=document.getElementById('pendList');
   if(!cola.length){list.innerHTML='<div class="empty">Todo sincronizado.</div>';return;}
-  const lbl={plantilla:'Plantilla',cota:'Cota',cierre:'Cierre'};
+  const lbl={plantilla:'Plantilla',cota:'Cota',cierre:'Cierre',foto:'Foto'};
   list.innerHTML=cola.sort((a,b)=>b.localId.localeCompare(a.localId)).map(it=>{
     let t='pend',tt=lbl[it.op]||it.op,sub='';
-    if(it.op==='cota'){t=it.veredicto==='OK'?'ok':'no';sub=`pza ${it.numPieza} · cota ${it.cota} · med ${it.medido||''}`;}
+    if(it.op==='cota'){t=it.veredicto==='OK'?'ok':'no';sub=`pza ${it.numPieza} · cota ${it.cota}${it.medido?(' · med '+it.medido):''}`;}
     else if(it.op==='cierre'){t=it.total==='OK'?'ok':'no';sub=`pza ${it.numPieza} · cierre ${it.total}`;}
+    else if(it.op==='foto'){sub=`pza ${it.numPieza} · foto de pieza`;}
     else {sub=`${(it.cotas||[]).length} cotas`;}
     return `<div class="item"><span class="tag ${t}">${tt}</span><div class="meta"><b>${it.numParte}</b><small>${it.cliente?it.cliente+' · ':''}${sub}</small></div></div>`;
   }).join('');
@@ -662,7 +759,7 @@ async function limpiarCola(){const pin=prompt('PIN de administrador:');if(pin!==
 async function cargarDatos(force){
   if(navigator.onLine&&urlReady()){
     try{const r=await fetch(APPS_URL+'?action=list',{method:'GET'});const j=await r.json();
-      if(j&&j.ok){SRV={plantillas:j.plantillas||[],inspecciones:j.inspecciones||[],cierres:j.cierres||[]};await idbPut('cache',{k:'srv',v:SRV});}
+      if(j&&j.ok){SRV={plantillas:j.plantillas||[],inspecciones:j.inspecciones||[],cierres:j.cierres||[],fotos:j.fotos||[]};await idbPut('cache',{k:'srv',v:SRV});}
     }catch(e){if(force)toast('No se pudo actualizar. Muestro últimos datos',true);}
   }else if(force)toast('Sin conexión. Muestro últimos datos',true);
   if(!SRV.inspecciones.length&&!SRV.cierres.length){const c=await idbGet('cache','srv');if(c)SRV=c.v;}
