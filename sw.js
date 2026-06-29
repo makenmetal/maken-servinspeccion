@@ -1,7 +1,7 @@
 /* MAKEN · Inspección y Liberación — Service Worker
    Guarda la página en el teléfono para que abra SIN INTERNET.
    Para forzar una actualización tras cambiar index.html, sube el número de versión. */
-const CACHE = 'maken-insp-v2';
+const CACHE = 'maken-insp-v3';
 const SHELL = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', e => {
