@@ -163,6 +163,27 @@
   .cat-tog.sec{background:#fff7e9;color:#9a6400}
   .cdef-card .delc{border:none;background:none;color:var(--no);font-size:20px;cursor:pointer;padding:0}
   .badge-sec{font-size:9px;font-weight:800;background:#fff7e9;color:#9a6400;border:1px solid #f5c877;padding:1px 5px;border-radius:5px;margin-left:6px;vertical-align:middle}
+
+  /* detalle de cota (Consulta) */
+  .dcard{border:1px solid var(--line);border-left-width:5px;border-radius:10px;padding:12px 14px;margin-bottom:10px;background:#fff}
+  .dcard.ok{border-left-color:var(--ok)}
+  .dcard.no{border-left-color:var(--no);background:#fff6f6}
+  .dcard.pend{border-left-color:#cbd5dd;background:#fbfcfd}
+  .dcard-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .dcard-top b{font-size:16px}
+  .dpill{font-size:11px;font-weight:800;padding:4px 11px;border-radius:999px;white-space:nowrap}
+  .dpill.ok{background:var(--ok-bg);color:var(--ok)}
+  .dpill.no{background:var(--no-bg);color:var(--no)}
+  .dpill.pend{background:var(--pend-bg);color:var(--muted)}
+  .ddesc{font-size:13px;color:var(--ink);margin-top:5px;line-height:1.35}
+  .dvals{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+  .dval{font-size:12px;background:#eef2f5;border-radius:7px;padding:5px 10px;color:var(--ink)}
+  .dval b{font-weight:800}
+  .dval.bad{background:var(--no-bg);color:var(--no)}
+  .dval.good{background:var(--ok-bg);color:var(--ok)}
+  .dtag{font-size:10px;font-weight:800;padding:2px 7px;border-radius:5px;margin-left:6px;vertical-align:middle}
+  .dtag.vis{background:#f3eefe;color:#7c3aed}
+  .dtag.sec{background:#fff7e9;color:#9a6400}
   .thumbs{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
   .thumb{width:62px;height:62px;border-radius:9px;border:1px solid var(--line);overflow:hidden;position:relative;background:#f1f5f9;display:flex;align-items:center;justify-content:center}
   .thumb img{width:100%;height:100%;object-fit:cover}
@@ -834,13 +855,24 @@ async function verPieza(parte,pieza){
   else {dc.style.display='block';dc.className='closebanner';dc.style.background='#f1f5f9';dc.style.color='#6b7681';dc.textContent='Pieza abierta (sin cerrar)';}
   document.getElementById('detCotas').innerHTML=cotas.length?cotas.map(c=>{
     const rec=s.insp[parte+'|'+pieza+'|'+c.cota];
-    const sec=(c.cat==='secundaria')?' <span class="badge-sec">SEC</span>':'';
-    const vis=(c.tipo==='visual'); let stt='pend',lbl='Pendiente';
-    if(rec){ if(rec.veredicto==='OK'){stt='ok';lbl='OK';} else {stt='no';lbl='NO OK';} }
-    let det;
-    if(rec){ det=vis?(rec.veredicto==='NO OK'?(rec.comentario||'defecto'):'visual OK'):('nom '+(c.nominal||'—')+' · tol '+(c.tol||'—')+(rec.medido?(' · med '+rec.medido):'')+(rec.comentario?(' · '+rec.comentario):'')); }
-    else { det=vis?('visual'+(c.desc?(' · '+c.desc):'')):('nom '+(c.nominal||'—')+' · tol '+(c.tol||'—')); }
-    return `<div class="item"><span class="cstat ${stt}">${lbl}</span><div class="meta"><b>Cota ${c.cota}${sec}</b><small>${c.desc?c.desc+' — ':''}${det}</small></div></div>`;
+    const vis=(c.tipo==='visual');
+    let cls='pend',lbl='Pendiente';
+    if(rec){ if(rec.veredicto==='OK'){cls='ok';lbl='OK';} else {cls='no';lbl='NO OK';} }
+    const tags=(c.cat==='secundaria'?'<span class="dtag sec">SEC</span>':'')+(vis?'<span class="dtag vis">VISUAL</span>':'');
+    let vals='';
+    if(vis){
+      if(rec) vals=`<div class="dvals"><span class="dval ${rec.veredicto==='OK'?'good':'bad'}">${rec.veredicto==='OK'?'✓ Sin defectos':('Defecto: '+(rec.comentario||'—'))}</span></div>`;
+    } else {
+      const chips=[`<span class="dval">Nom <b>${c.nominal||'—'}</b></span>`,`<span class="dval">Tol <b>${c.tol||'—'}</b></span>`];
+      if(rec&&rec.medido) chips.push(`<span class="dval ${rec.veredicto==='OK'?'good':'bad'}">Medido <b>${rec.medido}</b></span>`);
+      if(rec&&rec.comentario) chips.push(`<span class="dval">💬 ${rec.comentario}</span>`);
+      vals=`<div class="dvals">${chips.join('')}</div>`;
+    }
+    return `<div class="dcard ${cls}">
+      <div class="dcard-top"><b>Cota ${c.cota}${tags}</b><span class="dpill ${cls}">${lbl}</span></div>
+      ${c.desc?`<div class="ddesc">${c.desc}</div>`:''}
+      ${vals}
+    </div>`;
   }).join(''):'<div class="empty">Sin cotas.</div>';
   const thumbs=[];
   (s.fotos[parte+'|'+pieza]||[]).forEach(f=>{ if(f.local) thumbs.push({img:f.data}); else thumbs.push({img:driveThumb(f.url),url:f.url}); });
