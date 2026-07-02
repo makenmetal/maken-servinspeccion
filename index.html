@@ -152,13 +152,17 @@
   .login-back{display:block;text-align:center;margin-top:14px;color:var(--blue);font-size:13px;font-weight:600;cursor:pointer}
 
   .cdef-card{border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px;background:#fbfcfd}
-  .cdef-l1{display:grid;grid-template-columns:48px 86px 1fr 26px;gap:6px;align-items:center}
+  .cdef-l1{display:grid;grid-template-columns:44px 1fr 1fr 24px;gap:6px;align-items:center}
   .cdef-l2{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px}
   .cdef-card input{width:100%;padding:9px 6px;border:1px solid var(--line);border-radius:8px;font-size:14px;background:#fff}
   .cdef-card .d-cota{text-align:center}
-  .tipo-tog{padding:9px 4px;border:1px solid var(--line);border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;background:#eef6ff;color:var(--blue)}
+  .tipo-tog,.cat-tog{padding:9px 4px;border:1px solid var(--line);border-radius:8px;font-size:12px;font-weight:800;cursor:pointer}
+  .tipo-tog{background:#eef6ff;color:var(--blue)}
   .tipo-tog.visual{background:#f3eefe;color:#7c3aed}
+  .cat-tog{background:#eefbf1;color:#0f7a3d}
+  .cat-tog.sec{background:#fff7e9;color:#9a6400}
   .cdef-card .delc{border:none;background:none;color:var(--no);font-size:20px;cursor:pointer;padding:0}
+  .badge-sec{font-size:9px;font-weight:800;background:#fff7e9;color:#9a6400;border:1px solid #f5c877;padding:1px 5px;border-radius:5px;margin-left:6px;vertical-align:middle}
   .thumbs{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
   .thumb{width:62px;height:62px;border-radius:9px;border:1px solid var(--line);overflow:hidden;position:relative;background:#f1f5f9;display:flex;align-items:center;justify-content:center}
   .thumb img{width:100%;height:100%;object-fit:cover}
@@ -319,20 +323,29 @@
 
   <!-- ===== CONSULTAR ===== -->
   <section id="v-consultar" class="view">
-    <div class="card">
-      <div class="row">
-        <div style="flex:1"><label>Cliente</label><select id="fCliente" onchange="renderDash()"><option value="">Todos</option></select></div>
-        <div style="flex:1"><label>No. de parte</label><select id="fParte" onchange="renderDash()"><option value="">Todos</option></select></div>
+    <div id="dashMain">
+      <div class="card">
+        <div class="row">
+          <div style="flex:1"><label>Cliente</label><select id="fCliente" onchange="renderDash()"><option value="">Todos</option></select></div>
+          <div style="flex:1"><label>No. de parte</label><select id="fParte" onchange="renderDash()"><option value="">Todos</option></select></div>
+        </div>
+        <button class="btn-primary btn-ghost" style="margin-top:12px" onclick="cargarDatos(true)">↻ Actualizar datos</button>
       </div>
-      <button class="btn-primary btn-ghost" style="margin-top:12px" onclick="cargarDatos(true)">↻ Actualizar datos</button>
+      <div class="kpis">
+        <div class="kpi"><b id="kPiezas">0</b><small>Piezas</small></div>
+        <div class="kpi okk"><b id="kOk">0</b><small>Cerradas OK</small></div>
+        <div class="kpi nokk"><b id="kNo">0</b><small>Cerradas NO OK</small></div>
+      </div>
+      <div class="card"><h2>Avance por pieza <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(toca para ver detalle)</span></h2><div id="piezaProg"><div class="empty">Sin datos.</div></div></div>
+      <div class="card"><h2>Cotas que más fallan</h2><div id="pareto"><div class="empty">Sin rechazos.</div></div></div>
     </div>
-    <div class="kpis">
-      <div class="kpi"><b id="kPiezas">0</b><small>Piezas</small></div>
-      <div class="kpi okk"><b id="kOk">0</b><small>Cerradas OK</small></div>
-      <div class="kpi nokk"><b id="kNo">0</b><small>Cerradas NO OK</small></div>
+
+    <div id="piezaDetalle" style="display:none">
+      <div class="ctxbar"><span class="ctxpath" id="detHead"></span><a onclick="volverDash()">← Volver</a></div>
+      <div id="detCie" class="closebanner" style="display:none"></div>
+      <div class="card"><h2>Cotas</h2><div id="detCotas"></div></div>
+      <div class="card"><h2>Fotos</h2><div id="detFotos" class="thumbs"></div></div>
     </div>
-    <div class="card"><h2>Avance por pieza</h2><div id="piezaProg"><div class="empty">Sin datos.</div></div></div>
-    <div class="card"><h2>Cotas que más fallan</h2><div id="pareto"><div class="empty">Sin rechazos.</div></div></div>
   </section>
 </main>
 
@@ -416,7 +429,7 @@ function show(v){
   document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
   document.getElementById('n-'+v).classList.add('active');
   if(v==='pendientes') renderPend();
-  if(v==='consultar') cargarDatos(false);
+  if(v==='consultar'){ volverDash(); cargarDatos(false); }
   window.scrollTo(0,0);
 }
 let toastT;
@@ -508,31 +521,30 @@ function openPlantilla(cotas){
   document.getElementById('plErr').style.display='none';
 }
 function addCdefRow(c){
-  c=c||{};const vis=(c.tipo==='visual');
+  c=c||{};const vis=(c.tipo==='visual');const sec=(c.cat==='secundaria');
   const row=document.createElement('div');row.className='cdef-card';
   row.innerHTML=
     `<div class="cdef-l1">`+
-      `<input class="d-cota mono" inputmode="numeric" placeholder="#" value="${c.cota||''}">`+
+      `<input class="d-cota mono" inputmode="numeric" placeholder="#" value="${attrEsc(c.cota)}">`+
+      `<button class="cat-tog ${sec?'sec':''}" onclick="toggleCat(this)">${sec?'Secundaria':'Primaria'}</button>`+
       `<button class="tipo-tog ${vis?'visual':''}" onclick="toggleTipo(this)">${vis?'Visual':'Métrico'}</button>`+
-      `<input class="d-desc" placeholder="descripción" value="${(c.desc||'').replace(/"/g,'&quot;')}">`+
       `<button class="delc" onclick="this.closest('.cdef-card').remove()">×</button>`+
     `</div>`+
+    `<input class="d-desc" placeholder="descripción" value="${attrEsc(c.desc)}" style="margin-top:6px">`+
     `<div class="cdef-l2" style="${vis?'display:none':''}">`+
-      `<input class="d-nom mono" inputmode="decimal" placeholder="nominal" value="${c.nominal||''}">`+
-      `<input class="d-tol" placeholder="±tol (ej. ±0.05)" value="${c.tol||''}">`+
+      `<input class="d-nom mono" inputmode="decimal" placeholder="nominal" value="${attrEsc(c.nominal)}">`+
+      `<input class="d-tol" placeholder="±tol (ej. ±0.05)" value="${attrEsc(c.tol)}">`+
     `</div>`;
   document.getElementById('cdefList').appendChild(row);
 }
-function toggleTipo(btn){
-  const vis=btn.classList.toggle('visual');
-  btn.textContent=vis?'Visual':'Métrico';
-  btn.closest('.cdef-card').querySelector('.cdef-l2').style.display=vis?'none':'';
-}
+function toggleTipo(btn){const vis=btn.classList.toggle('visual');btn.textContent=vis?'Visual':'Métrico';btn.closest('.cdef-card').querySelector('.cdef-l2').style.display=vis?'none':'';}
+function toggleCat(btn){const sec=btn.classList.toggle('sec');btn.textContent=sec?'Secundaria':'Primaria';}
 async function editarPlantilla(){const s=await buildState();openPlantilla(s.plant[activePart]||[]);}
 async function guardarPlantilla(){
   const rows=[...document.querySelectorAll('#cdefList .cdef-card')].map(r=>{
     const vis=r.querySelector('.tipo-tog').classList.contains('visual');
-    return {cota:r.querySelector('.d-cota').value.trim(),tipo:vis?'visual':'metrico',
+    const sec=r.querySelector('.cat-tog').classList.contains('sec');
+    return {cota:r.querySelector('.d-cota').value.trim(),cat:sec?'secundaria':'primaria',tipo:vis?'visual':'metrico',
       desc:r.querySelector('.d-desc').value.trim(),
       nominal:vis?'':r.querySelector('.d-nom').value.trim(),
       tol:vis?'':r.querySelector('.d-tol').value.trim()};
@@ -580,13 +592,17 @@ async function renderPieza(){
   const s=await buildState();
   const cotas=s.plant[activePart]||[];
   let ok=0,no=0,done=0;
+  let pTot=0,pDone=0,sTot=0,sDone=0;
   const list=document.getElementById('cotaList');
   list.innerHTML=cotas.map(c=>{
     const rec=s.insp[activePart+'|'+activePiece+'|'+c.cota];
+    const sec=(c.cat==='secundaria');
+    if(sec) sTot++; else pTot++;
     let stt='pend',lbl='Pendiente';
-    if(rec){done++; if(rec.veredicto==='OK'){ok++;stt='ok';lbl='OK';} else {no++;stt='no';lbl='NO OK';}}
+    if(rec){done++; if(sec)sDone++; else pDone++; if(rec.veredicto==='OK'){ok++;stt='ok';lbl='OK';} else {no++;stt='no';lbl='NO OK';}}
     const visual=(c.tipo==='visual');
     const tipoTag=visual?'<span style="color:#7c3aed;font-weight:700">Visual</span>':'';
+    const secBadge=sec?'<span class="badge-sec">SEC</span>':'';
     const specParts=visual?[c.desc].filter(Boolean):[c.desc,(c.nominal?('nom '+c.nominal):''),(c.tol?('tol '+c.tol):'')].filter(Boolean);
     const spec=specParts.join(' · ');
     let extra='';
@@ -611,9 +627,9 @@ async function renderPieza(){
         <label style="margin-top:10px">Comentario (opcional)</label>
         <input type="text" id="com-${esc(c.cota)}" placeholder="nota (opcional)" value="${attrEsc(rec?rec.comentario:'')}">`;
     }
-    return `<div class="cota" id="cota-${esc(c.cota)}" data-tipo="${visual?'visual':'metrico'}" data-nom="${attrEsc(c.nominal)}" data-tol="${attrEsc(c.tol)}" data-desc="${attrEsc(c.desc)}">
+    return `<div class="cota" id="cota-${esc(c.cota)}" data-tipo="${visual?'visual':'metrico'}" data-cat="${sec?'secundaria':'primaria'}" data-nom="${attrEsc(c.nominal)}" data-tol="${attrEsc(c.tol)}" data-desc="${attrEsc(c.desc)}">
       <div class="cota-h" onclick="toggleCota('${esc(c.cota)}')">
-        <span class="num">${c.cota}</span><span class="spec">${tipoTag}${tipoTag&&spec?' · ':''}${spec}${extra}</span><span class="cstat ${stt}">${lbl}</span>
+        <span class="num">${c.cota}</span><span class="spec">${secBadge}${tipoTag}${tipoTag&&spec?' · ':''}${spec}${extra}</span><span class="cstat ${stt}">${lbl}</span>
       </div>
       <div class="cota-body">${body}
         <button class="btn-primary" style="margin-top:12px" onclick="guardarCota('${esc(c.cota)}')">Guardar cota</button>
@@ -623,7 +639,7 @@ async function renderPieza(){
   cotas.forEach(c=>{const rec=s.insp[activePart+'|'+activePiece+'|'+c.cota];if(rec)markV(c.cota,rec.veredicto);});
   // progreso
   const tot=cotas.length;
-  document.getElementById('progNums').textContent=`${done}/${tot} cotas · ${ok} OK · ${no} NO`;
+  document.getElementById('progNums').innerHTML=`${done}/${tot} · ${ok} OK · ${no} NO`+(sTot?` &nbsp;·&nbsp; <span style="color:#9a6400;font-weight:700">SEC ${sDone}/${sTot}</span>`:'');
   document.getElementById('segOk').style.width=(tot?ok/tot*100:0)+'%';
   document.getElementById('segNo').style.width=(tot?no/tot*100:0)+'%';
   // sugerencia de cierre
@@ -660,7 +676,7 @@ function autoVerdict(nominal,tol,medido){
 function autoSuggest(c){const el=document.getElementById('cota-'+c);const me=document.getElementById('med-'+c);const med=me?me.value.trim():'';const v=autoVerdict(el.dataset.nom,el.dataset.tol,med);if(v){markV(c,v);el.dataset.v=v;}}
 async function guardarCota(c){
   const el=document.getElementById('cota-'+c);
-  const tipo=el.dataset.tipo, nom=el.dataset.nom||'', tol=el.dataset.tol||'', desc=el.dataset.desc||'';
+  const tipo=el.dataset.tipo, cat=el.dataset.cat||'primaria', nom=el.dataset.nom||'', tol=el.dataset.tol||'', desc=el.dataset.desc||'';
   const v=el.dataset.v;
   const me=document.getElementById('med-'+c); const med=me?me.value.trim():'';
   const co=document.getElementById('com-'+c); const com=co?co.value.trim():'';
@@ -671,7 +687,7 @@ async function guardarCota(c){
   }
   await enqueue({localId:Date.now()+'-'+Math.random().toString(36).slice(2,6),key:'cota|'+activePart+'|'+activePiece+'|'+c,op:'cota',
     cliente:activeCli,proyecto:activeProy,numParte:activePart,numPieza:activePiece,cota:c,
-    tipo:tipo,nominal:nom,tol:tol,desc:desc,medido:med,comentario:com,veredicto:v,
+    cat:cat,tipo:tipo,nominal:nom,tol:tol,desc:desc,medido:med,comentario:com,veredicto:v,
     fechaInspeccion:today(),capturadoEn:new Date().toISOString()});
   toast(v==='OK'?'✓ Cota aceptada':'✕ Cota rechazada');
   if(navigator.onLine) sincronizar(true);
@@ -798,7 +814,7 @@ async function renderDash(){
   document.getElementById('kNo').textContent=arr.filter(p=>p.total==='NO OK').length;
   document.getElementById('piezaProg').innerHTML=arr.length?arr.sort((a,b)=>(a.parte+a.pieza).localeCompare(b.parte+b.pieza)).map(p=>{
     const tag=p.total?`<span class="tag ${p.total==='OK'?'ok':'no'}">${p.total}</span>`:`<span class="tag pend">Abierta</span>`;
-    return `<div class="item">${tag}<div class="meta"><b>${p.parte} · pza ${p.pieza}</b><small>${p.cliente?p.cliente+' · ':''}${p.done}/${p.tot} cotas · ${p.ok} OK / ${p.no} NO</small></div></div>`;
+    return `<div class="item" style="cursor:pointer" onclick="verPieza('${esc(p.parte)}','${esc(p.pieza)}')">${tag}<div class="meta"><b>${p.parte} · pza ${p.pieza}</b><small>${p.cliente?p.cliente+' · ':''}${p.done}/${p.tot} cotas · ${p.ok} OK / ${p.no} NO</small></div><span style="color:var(--muted);font-size:18px">›</span></div>`;
   }).join(''):'<div class="empty">Sin datos.</div>';
   // pareto cotas que más fallan
   const fail={};
@@ -806,6 +822,37 @@ async function renderDash(){
   const pairs=Object.entries(fail).sort((a,b)=>b[1]-a[1]).slice(0,12);const mx=pairs.length?pairs[0][1]:1;
   document.getElementById('pareto').innerHTML=pairs.length?pairs.map(([k,c])=>`<div class="pareto-row"><span class="lbl">${k}</span><div class="track"><div class="fill" style="width:${c/mx*100}%"></div></div><span class="cnt">${c}</span></div>`).join(''):'<div class="empty">Sin rechazos.</div>';
 }
+
+/* ================= Detalle de pieza (Consulta) ================= */
+function driveThumb(url){ if(!url) return null; const m=String(url).match(/[-\w]{25,}/); return m?('https://drive.google.com/thumbnail?id='+m[0]+'&sz=w400'):null; }
+async function verPieza(parte,pieza){
+  const s=await buildState();
+  const cotas=s.plant[parte]||[];
+  document.getElementById('detHead').innerHTML=`${parte}<span class="sep">›</span>pza ${pieza}`;
+  const cie=s.cie[parte+'|'+pieza]; const dc=document.getElementById('detCie');
+  if(cie){dc.style.display='block';dc.className='closebanner '+(cie.total==='OK'?'ok':'no');dc.textContent='Pieza cerrada: '+cie.total+(cie.fechaCierre?(' · '+cie.fechaCierre):'')+(cie._local?' (sin subir)':'');}
+  else {dc.style.display='block';dc.className='closebanner';dc.style.background='#f1f5f9';dc.style.color='#6b7681';dc.textContent='Pieza abierta (sin cerrar)';}
+  document.getElementById('detCotas').innerHTML=cotas.length?cotas.map(c=>{
+    const rec=s.insp[parte+'|'+pieza+'|'+c.cota];
+    const sec=(c.cat==='secundaria')?' <span class="badge-sec">SEC</span>':'';
+    const vis=(c.tipo==='visual'); let stt='pend',lbl='Pendiente';
+    if(rec){ if(rec.veredicto==='OK'){stt='ok';lbl='OK';} else {stt='no';lbl='NO OK';} }
+    let det;
+    if(rec){ det=vis?(rec.veredicto==='NO OK'?(rec.comentario||'defecto'):'visual OK'):('nom '+(c.nominal||'—')+' · tol '+(c.tol||'—')+(rec.medido?(' · med '+rec.medido):'')+(rec.comentario?(' · '+rec.comentario):'')); }
+    else { det=vis?('visual'+(c.desc?(' · '+c.desc):'')):('nom '+(c.nominal||'—')+' · tol '+(c.tol||'—')); }
+    return `<div class="item"><span class="cstat ${stt}">${lbl}</span><div class="meta"><b>Cota ${c.cota}${sec}</b><small>${c.desc?c.desc+' — ':''}${det}</small></div></div>`;
+  }).join(''):'<div class="empty">Sin cotas.</div>';
+  const thumbs=[];
+  (s.fotos[parte+'|'+pieza]||[]).forEach(f=>{ if(f.local) thumbs.push({img:f.data}); else thumbs.push({img:driveThumb(f.url),url:f.url}); });
+  if(cie){ [cie.fotoHojaURL,cie.fotoPiezaURL].forEach(u=>{ if(u) thumbs.push({img:driveThumb(u),url:u}); }); }
+  document.getElementById('detFotos').innerHTML=thumbs.length?thumbs.map(t=>
+    t.img?`<div class="thumb"><a href="${t.url||t.img}" target="_blank"><img src="${t.img}" onerror="this.outerHTML='📷'"></a></div>`:`<div class="thumb"><a href="${t.url}" target="_blank">📷</a></div>`
+  ).join(''):'<div class="empty" style="padding:10px">Sin fotos.</div>';
+  document.getElementById('dashMain').style.display='none';
+  document.getElementById('piezaDetalle').style.display='block';
+  window.scrollTo(0,0);
+}
+function volverDash(){document.getElementById('piezaDetalle').style.display='none';document.getElementById('dashMain').style.display='block';}
 
 /* ================= Net ================= */
 function netStatus(){const on=navigator.onLine;const c=document.getElementById('netChip'),t=document.getElementById('netTxt');
