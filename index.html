@@ -184,6 +184,21 @@
   .dtag{font-size:10px;font-weight:800;padding:2px 7px;border-radius:5px;margin-left:6px;vertical-align:middle}
   .dtag.vis{background:#f3eefe;color:#7c3aed}
   .dtag.sec{background:#fff7e9;color:#9a6400}
+  .dpill.prog{background:#fff7e9;color:#9a6400}
+
+  /* tarjetas de pieza (resumen Consulta) */
+  .pcard{border:1px solid var(--line);border-left-width:6px;border-radius:12px;padding:13px 14px;margin-bottom:10px;background:#fff;cursor:pointer}
+  .pcard.ok{border-left-color:var(--ok)}
+  .pcard.no{border-left-color:var(--no);background:#fff6f6}
+  .pcard.prog{border-left-color:var(--amber)}
+  .pcard-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .pcard-top b{font-size:15px}
+  .pcard-sub{font-size:12px;color:var(--muted);margin-top:2px}
+  .pbar-row{display:flex;align-items:center;gap:10px;margin-top:9px}
+  .pbar{flex:1;height:12px;background:#e7ebee;border-radius:999px;overflow:hidden;display:flex}
+  .pbar .s-ok{background:var(--ok)}.pbar .s-no{background:var(--no)}
+  .ppct{font-size:16px;font-weight:800;color:var(--steel);min-width:44px;text-align:right}
+  .pcounts{font-size:12px;color:var(--muted);margin-top:7px}
   .thumbs{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
   .thumb{width:62px;height:62px;border-radius:9px;border:1px solid var(--line);overflow:hidden;position:relative;background:#f1f5f9;display:flex;align-items:center;justify-content:center}
   .thumb img{width:100%;height:100%;object-fit:cover}
@@ -834,8 +849,20 @@ async function renderDash(){
   document.getElementById('kOk').textContent=arr.filter(p=>p.total==='OK').length;
   document.getElementById('kNo').textContent=arr.filter(p=>p.total==='NO OK').length;
   document.getElementById('piezaProg').innerHTML=arr.length?arr.sort((a,b)=>(a.parte+a.pieza).localeCompare(b.parte+b.pieza)).map(p=>{
-    const tag=p.total?`<span class="tag ${p.total==='OK'?'ok':'no'}">${p.total}</span>`:`<span class="tag pend">Abierta</span>`;
-    return `<div class="item" style="cursor:pointer" onclick="verPieza('${esc(p.parte)}','${esc(p.pieza)}')">${tag}<div class="meta"><b>${p.parte} · pza ${p.pieza}</b><small>${p.cliente?p.cliente+' · ':''}${p.done}/${p.tot} cotas · ${p.ok} OK / ${p.no} NO</small></div><span style="color:var(--muted);font-size:18px">›</span></div>`;
+    const tot=p.tot||0, pct=tot?Math.round(p.done/tot*100):0;
+    let cls,lbl,pill;
+    if(p.total==='OK'){cls='ok';lbl='Cerrada OK';pill='ok';}
+    else if(p.total==='NO OK'){cls='no';lbl='Cerrada NO OK';pill='no';}
+    else if(p.no>0){cls='no';lbl='Con rechazo';pill='no';}
+    else if(tot>0&&p.done>=tot){cls='ok';lbl='Lista p/ cerrar';pill='ok';}
+    else {cls='prog';lbl='En proceso';pill='prog';}
+    const okW=tot?p.ok/tot*100:0, noW=tot?p.no/tot*100:0;
+    return `<div class="pcard ${cls}" onclick="verPieza('${esc(p.parte)}','${esc(p.pieza)}')">
+      <div class="pcard-top"><b>${p.parte} · pza ${p.pieza}</b><span class="dpill ${pill}">${lbl}</span></div>
+      ${p.cliente?`<div class="pcard-sub">${p.cliente}</div>`:''}
+      <div class="pbar-row"><div class="pbar"><div class="s-ok" style="width:${okW}%"></div><div class="s-no" style="width:${noW}%"></div></div><div class="ppct">${pct}%</div></div>
+      <div class="pcounts">${p.done}/${tot} cotas · ${p.ok} OK · ${p.no} NO</div>
+    </div>`;
   }).join(''):'<div class="empty">Sin datos.</div>';
   // pareto cotas que más fallan
   const fail={};
